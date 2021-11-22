@@ -16,4 +16,30 @@ include CBC_Sim_Init.jl
 
 ## Examples
 
+The main experiment simulation is run using the function `Run_Exp_save_output`
+
+This function can be found in `CBC_Sim_Experiments.jl`
+
+Ensure that a directory exists in the CBC project folder named `Outputs`
+
+The following are a list of parameters used with the function:
+* `N` 
+* `b`
+* `d`
+* `p`
+* `mu`
+* `sig`
+* `del`
+* `R_real`
+* `n_pulse`
+* `Nmax`
+* `N_seed`
+* `t_CO`
+* `t_DT`
+* `Nsim`
+* `Passage`
+* `insta_kill`
+* `lim_probs`
+* `psi`
+* `al` 
 
