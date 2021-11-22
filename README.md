@@ -9,10 +9,14 @@ CBC requires the following julia packages:
 
 CBC currently runs on [julia](https://julialang.org/) version >= 1.4.0
 
-CBC can be loaded on a local or remote machine by running 
+n.b. that because CBC requires `RCall`, it also requires a version of [R](https://www.r-project.org/). 
+Details on how to get `RCall` working with `julia` can be found [here](https://juliainterop.github.io/RCall.jl/stable/installation/).
+
+CBC can be loaded on a local or remote machine by downloading the 6 CBC `.jl` files and running 
 ```julia
 include CBC_Sim_Init.jl
 ```
+in julia from within the CBC directory. 
 
 ## Simulation Design 
 
