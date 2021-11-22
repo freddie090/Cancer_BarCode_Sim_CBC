@@ -1,18 +1,18 @@
 # Cancer BarCode (CBC) Simulation 
 
-CBC is an agent-based model implemented in [julia](https://julialang.org/) that simulates the experimental evolution of uniquely barcoded cancer cells. 
+`CBC` is an agent-based model implemented in [julia](https://julialang.org/) that simulates the experimental evolution of uniquely barcoded cancer cells. 
 
 ## Packages and Versions
 
-CBC requires the following julia packages: 
+`CBC` requires the following julia packages: 
 `Distributions`,`DataFrames`,`RCall`,`CSV`
 
-CBC currently runs on [julia](https://julialang.org/) version >= 1.4.0
+`CBC` currently runs on [julia](https://julialang.org/) version >= 1.4.0
 
 n.b. that because CBC requires `RCall`, it also requires a version of [R](https://www.r-project.org/). 
 Details on how to get `RCall` working with `julia` can be found [here](https://juliainterop.github.io/RCall.jl/stable/installation/).
 
-CBC can be loaded on a local or remote machine by downloading the 6 CBC `.jl` files and running 
+`CBC` can be loaded on a local or remote machine by downloading the 6 `CBC.jl` files and running 
 ```julia
 include CBC_Sim_Init.jl
 ```
@@ -80,7 +80,12 @@ function Run_Exp_save_output(N::Int64, b::Float64, d::Float64, p::Float64,
 For example, the following runs a given simulation with the specified parameter values in julia: 
 
 ```julia 
-Run_Exp_save_output(1000000, 0.8, 0.2, 0.0, 10^-4, 10^-4, 0.9, "l", 60, 6400000, 100000, 120.0, 120.0, 1, 4, true, true)
+Run_Exp_save_output(1000000, 0.8, 0.2, 0.0, 10^-7, 10^-4, 0.0, "l", 60, 64000000, 1000000, 120.0, 120.0, 1, 4, true, true)
 ```
 
-
+n.b. that `CBC` requires a directory called `Outputs` in the same directory as the `CBC.jl` files. 
+The simulation outputs will then be stored in a directory where the name of the directory contains important simulation parameter information. 
+Within this directory, simulation files will be stored in seperate `Sim_i` sub-directories for each `Nsim` run. 
+`Run_Exp_save_output` provides two types of output files for each passage (`Pi`):
+* `bc_counts_tot_mean_R_Pi.csv` - a dataframe containing barcode IDs, their final cell counts in each replicate and the total number of resistant cells in each replicate. 
+* `N_by_t_Pi.csv` - the total replicate population size over time.
