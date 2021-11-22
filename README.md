@@ -23,7 +23,7 @@ The simulation recapitulates key features of an evolutionary experiment as follo
    * 4 are control (`CO`) replicates
    * 4 are drug-treatment (`DT`) replicates
 4. The sub-populations are grown until they reach a given population size. 
-   * The control replicates are simply growth with their assigned birth and death rates. 
+   * The control replicates are simply grown with their assigned birth and death rates. 
    * The drug-treatment replicates are periodically exposed to drug-treatment which kills cells given a resistant phenotype (`R`).
 5. This process is repeated for a given number of passages, where cells from the previous passage are used to seed the subsequent.
 6. The number of cells and the distribution of barcode lineages are stored for each replicate sub-population for statistical analysis.
@@ -62,5 +62,21 @@ The following are a list of parameters used with the function:
 * `Passage` - the number of passages replicate sub-populations will experience.
 * `insta_kill` - should cells be killed instantly after assignment to drug-treatment replicates, or allowed to grow for 1x `t_DT`.
 * `lim_probs` - should the resistant phenotype be assigned to cells when the simulation begins according to the parameter equilibrium frequencies? 
+
+The variable types for each function argument are as follows: 
+
+```julia 
+function Run_Exp_save_output(N::Int64, b::Float64, d::Float64, p::Float64,
+    mu::Float64, sig::Float64, del::Float64,
+    R_real::String, n_pulse::Int64, Nmax::Int64,
+    N_seed::Int64, t_CO::Float64, t_DT::Float64, Nsim::Int64, Passage::Int64,
+    insta_kill::Bool, lim_probs::Bool)
+```
+
+For example, the following runs a given simulation with the specified parameter values in julia: 
+
+```julia 
+Run_Exp_save_output(1000000, 0.8, 0.2, 0.0, 10^-4, 10^-4, 0.9, "l", 60, 6400000, 100000, 120.0, 120.0, 1, 4, true, true)
+```
 
 
