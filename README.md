@@ -20,11 +20,11 @@ The simulation recapitulates key features of an evolutionary experiment as follo
 1. Cells are tagged with a unique molecular 'barcode' that is completely heritable.
 2. All cells share a mutual expansion step. 
 3. The expanded cells are split into 8 replicate sub-populations. 
-  * 4 are control (`CO`) replicates
-  * 4 are drug-treatment (`DT`) replicates
+   * 4 are control (`CO`) replicates
+   * 4 are drug-treatment (`DT`) replicates
 4. The sub-populations are grown until they reach a given population size. 
-  * The control replicates are simply growth with their assigned birth and death rates. 
-  * The drug-treatment replicates are periodically exposed to drug-treatment which kills cells given a resistant phenotype (`R`).
+   * The control replicates are simply growth with their assigned birth and death rates. 
+   * The drug-treatment replicates are periodically exposed to drug-treatment which kills cells given a resistant phenotype (`R`).
 5. This process is repeated for a given number of passages, where cells from the previous passage are used to seed the subsequent.
 6. The number of cells and the distribution of barcode lineages are stored for each replicate sub-population for statistical analysis.
 
