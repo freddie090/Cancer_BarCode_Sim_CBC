@@ -23,9 +23,9 @@ import Base.Threads.@spawn
 # an 'Experiment_Input' object to continue with a N_seed randomly sampled
 # cells from the previous flask.
 
-function Run_Exp(N::Int64, b::Float64, d::Float64, p::Float64, mu::Float64,
-    sig::Float64, del::Float64, R_real::String,
-    n_pulse::Int64, Nmax::Int64, N_seed::Int64,
+function Run_Exp(N::Int64, b::Float64, d::Float64, t_exp::Float64,
+    p::Float64, mu::Float64, sig::Float64, del::Float64,
+    R_real::String, n_pulse::Int64, Nmax::Int64, N_seed::Int64,
     t_CO::Float64, t_DT::Float64, Passage::Int64,
     insta_kill::Bool, lim_probs::Bool;
     al=0.0::Float64, psi=0.0::Float64,
@@ -33,12 +33,8 @@ function Run_Exp(N::Int64, b::Float64, d::Float64, p::Float64, mu::Float64,
 
     if Passage == 1
 
-        # First expand and split the cells for t = 6.0.
-        #exp_split_cells = expand_split_cells(N, b, d, 6.0, N_seed, 4, p, mu, sig, del, psi=psi, al=al, R_real=R_real, use_lim_probs=lim_probs)
-        # First expand and split the cells for t = 7.0: for QR_HCTbc.
-        # exp_split_cells = expand_split_cells(N, b, d, 7.0, N_seed, 4, p, mu, sig, del, psi=psi, al=al, R_real=R_real, use_lim_probs=lim_probs)
-        # First expand and split the cells for t = 9.0: for QR_SW6bc.
-        exp_split_cells = expand_split_cells(N, b, d, 9.0, N_seed, 4, p, mu, sig, del, psi=psi, al=al, R_real=R_real, use_lim_probs=lim_probs)
+        # First expand and split the cells for t = t_exp
+        exp_split_cells = expand_split_cells(N, b, d, t_exp, N_seed, 4, p, mu, sig, del, psi=psi, al=al, R_real=R_real, use_lim_probs=lim_probs)
 
 
         Exp_Input.CO_inputs = exp_split_cells.CO_flasks
@@ -48,14 +44,14 @@ function Run_Exp(N::Int64, b::Float64, d::Float64, p::Float64, mu::Float64,
     CO_Outputs = Array{Grow_Kill_Rec_Out}(undef, 0)
     DT_Outputs = Array{Grow_Kill_Rec_Out}(undef, 0)
 
-    c1 = @spawn push!(CO_Outputs, grow_kill_rec_cells(Exp_Input.CO_inputs[:,1], t_CO, mu, sig, del, n_pulse, Nmax, R_real=R_real, psi=psi, al=al, rep_name = string("CO", 1, "P", Passage)))
-    c2 = @spawn push!(CO_Outputs, grow_kill_rec_cells(Exp_Input.CO_inputs[:,2], t_CO, mu, sig, del, n_pulse, Nmax, R_real=R_real, psi=psi, al=al, rep_name = string("CO", 2, "P", Passage)))
-    c3 = @spawn push!(CO_Outputs, grow_kill_rec_cells(Exp_Input.CO_inputs[:,3], t_CO, mu, sig, del, n_pulse, Nmax, R_real=R_real, psi=psi, al=al, rep_name = string("CO", 3, "P", Passage)))
-    c4 = @spawn push!(CO_Outputs, grow_kill_rec_cells(Exp_Input.CO_inputs[:,4], t_CO, mu, sig, del, n_pulse, Nmax, R_real=R_real, psi=psi, al=al, rep_name = string("CO", 4, "P", Passage)))
-    d1 = @spawn push!(DT_Outputs, grow_kill_rec_cells(Exp_Input.DT_inputs[:,1], t_DT, mu, sig, del, n_pulse, Nmax, R_real=R_real, psi=psi, al=al, drug_kill=true, insta_kill=insta_kill, rep_name = string("DT", 1, "P", Passage)))
-    d2 = @spawn push!(DT_Outputs, grow_kill_rec_cells(Exp_Input.DT_inputs[:,2], t_DT, mu, sig, del, n_pulse, Nmax, R_real=R_real, psi=psi, al=al, drug_kill=true, insta_kill=insta_kill, rep_name = string("DT", 2, "P", Passage)))
-    d3 = @spawn push!(DT_Outputs, grow_kill_rec_cells(Exp_Input.DT_inputs[:,3], t_DT, mu, sig, del, n_pulse, Nmax, R_real=R_real, psi=psi, al=al, drug_kill=true, insta_kill=insta_kill, rep_name = string("DT", 3, "P", Passage)))
-    d4 = @spawn push!(DT_Outputs, grow_kill_rec_cells(Exp_Input.DT_inputs[:,4], t_DT, mu, sig, del, n_pulse, Nmax, R_real=R_real, psi=psi, al=al, drug_kill=true, insta_kill=insta_kill, rep_name = string("DT", 4, "P", Passage)))
+    c1 = @spawn push!(CO_Outputs, grow_kill_rec_cells(Exp_Input.CO_inputs[:,1], t_CO, mu, sig, del, n_pulse, Nmax, R_real=R_real, psi=psi, al=al, rep_name = string("CO", 1, "P", Passage), must_Nmax=true))
+    c2 = @spawn push!(CO_Outputs, grow_kill_rec_cells(Exp_Input.CO_inputs[:,2], t_CO, mu, sig, del, n_pulse, Nmax, R_real=R_real, psi=psi, al=al, rep_name = string("CO", 2, "P", Passage), must_Nmax=true))
+    c3 = @spawn push!(CO_Outputs, grow_kill_rec_cells(Exp_Input.CO_inputs[:,3], t_CO, mu, sig, del, n_pulse, Nmax, R_real=R_real, psi=psi, al=al, rep_name = string("CO", 3, "P", Passage), must_Nmax=true))
+    c4 = @spawn push!(CO_Outputs, grow_kill_rec_cells(Exp_Input.CO_inputs[:,4], t_CO, mu, sig, del, n_pulse, Nmax, R_real=R_real, psi=psi, al=al, rep_name = string("CO", 4, "P", Passage), must_Nmax=true))
+    d1 = @spawn push!(DT_Outputs, grow_kill_rec_cells(Exp_Input.DT_inputs[:,1], t_DT, mu, sig, del, n_pulse, Nmax, R_real=R_real, psi=psi, al=al, drug_kill=true, insta_kill=insta_kill, rep_name = string("DT", 1, "P", Passage), must_Nmax=true))
+    d2 = @spawn push!(DT_Outputs, grow_kill_rec_cells(Exp_Input.DT_inputs[:,2], t_DT, mu, sig, del, n_pulse, Nmax, R_real=R_real, psi=psi, al=al, drug_kill=true, insta_kill=insta_kill, rep_name = string("DT", 2, "P", Passage), must_Nmax=true))
+    d3 = @spawn push!(DT_Outputs, grow_kill_rec_cells(Exp_Input.DT_inputs[:,3], t_DT, mu, sig, del, n_pulse, Nmax, R_real=R_real, psi=psi, al=al, drug_kill=true, insta_kill=insta_kill, rep_name = string("DT", 3, "P", Passage), must_Nmax=true))
+    d4 = @spawn push!(DT_Outputs, grow_kill_rec_cells(Exp_Input.DT_inputs[:,4], t_DT, mu, sig, del, n_pulse, Nmax, R_real=R_real, psi=psi, al=al, drug_kill=true, insta_kill=insta_kill, rep_name = string("DT", 4, "P", Passage), must_Nmax=true))
 
     wait(c1); wait(c2); wait(c3); wait(c4); wait(d1); wait(d2); wait(d3); wait(d4);
 
@@ -66,8 +62,8 @@ end
 
 # Run the experiment and save the output.
 
-function Run_Exp_save_output(N::Int64, b::Float64, d::Float64, p::Float64,
-    mu::Float64, sig::Float64, del::Float64,
+function Run_Exp_save_output(N::Int64, b::Float64, d::Float64, t_exp::Float64,
+    p::Float64, mu::Float64, sig::Float64, del::Float64,
     R_real::String, n_pulse::Int64, Nmax::Int64,
     N_seed::Int64, t_CO::Float64, t_DT::Float64, Nsim::Int64, Passage::Int64,
     insta_kill::Bool, lim_probs::Bool;
@@ -90,8 +86,9 @@ function Run_Exp_save_output(N::Int64, b::Float64, d::Float64, p::Float64,
 
 
     # Check for dir, and create if not
-    dir_name = string("CBC_Exp_out_N-", N, "_b-", round(b, digits=3),
-    "_d-", round(d, digits = 3), "_p-", round(p, digits = 10),
+    dir_name = string("CBC_Exp_out_N-", N,
+    "_b-", round(b, digits=3), "_d-", round(d, digits = 3),
+    "_t_exp-", round(t_exp, digits = 3), "_p-", round(p, digits = 10),
     "_mu-", round(mu, digits = 10), "_sig-", round(sig, digits = 10),
     "_del-", round(del, digits = 10),
     "_psi-", round(psi, digits = 10), "_al-", round(al, digits = 10),
@@ -119,15 +116,20 @@ function Run_Exp_save_output(N::Int64, b::Float64, d::Float64, p::Float64,
     # Call outside the for loop first for scoping.
     exp_in = Experiment_Input()
 
+    # Create vectors to hold output dataframes until all Passages have run.
+    bc_R_dfs = Array{DataFrame}(undef, 0)
+    N_dfs = Array{DataFrame}(undef, 0)
+    Ps = Array{Int64}(undef, 0)
+
     for P in 1:Passage
         if P == 1
-            exp_out = Run_Exp(N, b, d, p, mu, sig, del, R_real, n_pulse, Nmax,
-            N_seed, t_CO, t_DT, P, insta_kill, lim_probs,
+            exp_out = Run_Exp(N, b, d, t_exp, p, mu, sig, del, R_real, n_pulse,
+            Nmax, N_seed, t_CO, t_DT, P, insta_kill, lim_probs,
             psi=psi, al=al)
         else
 
-            exp_out = Run_Exp(N, b, d, p, mu, sig, del, R_real, n_pulse, Nmax,
-            N_seed, t_CO, t_DT, P, insta_kill, lim_probs,
+            exp_out = Run_Exp(N, b, d, t_exp, p, mu, sig, del, R_real, n_pulse,
+            Nmax, N_seed, t_CO, t_DT, P, insta_kill, lim_probs,
             psi=psi, al=al,
             Exp_Input=exp_in)
         end
@@ -150,12 +152,10 @@ function Run_Exp_save_output(N::Int64, b::Float64, d::Float64, p::Float64,
         N_df = all_N_by_ts(exp_out)
 
         #@rput bc_R_df ; @rput NRE_df ; @rput P
-        @rput bc_R_df; @rput N_df; @rput P
-        R"""
-        write.csv(bc_R_df, file=paste0("bc_counts_tot_mean_R_P", P, ".csv"), row.names = F)
-        #write.csv(NRE_df, file=paste0("NRE_by_t_P", P, ".csv"), row.names = F)
-        write.csv(N_df, file=paste0("N_by_t_P", P, ".csv"), row.names = F)
-        """
+        # Saving the dataframes until all Passages have run.
+        push!(bc_R_dfs, bc_R_df)
+        push!(N_dfs, N_df)
+        push!(Ps, P)
 
         # Might have had enough to save the barcode distributions and N vector,
         # but not enough cells to draw the next Passage's flasks from. Check
@@ -177,6 +177,22 @@ function Run_Exp_save_output(N::Int64, b::Float64, d::Float64, p::Float64,
             exp_in.CO_inputs[:,i] = sample(exp_out.CO_outputs[i].cells, N_seed, replace=false)
             exp_in.DT_inputs[:,i] = sample(exp_out.DT_outputs[i].cells, N_seed, replace=false)
         end
+
+    end
+
+    # Now save the outputs:
+    for i in 1:length(Ps)
+
+        bc_R_df = bc_R_dfs[i]
+        N_df = N_dfs[i]
+        Pass = Ps[i]
+
+        @rput bc_R_df; @rput N_df; @rput Pass
+        R"""
+        write.csv(bc_R_df, file=paste0("bc_counts_tot_mean_R_P", Pass, ".csv"), row.names = F)
+        #write.csv(NRE_df, file=paste0("NRE_by_t_P", Pass, ".csv"), row.names = F)
+        write.csv(N_df, file=paste0("N_by_t_P", Pass, ".csv"), row.names = F)
+        """
 
     end
 

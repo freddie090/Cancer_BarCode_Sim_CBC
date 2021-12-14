@@ -639,7 +639,8 @@ function grow_kill_rec_cells(cells::Array{CancerCell}, tmax::Float64,
     psi=0.0::Float64, al=0.0::Float64,
     R_real="b"::String, drug_kill::Bool=false, insta_kill::Bool=false,
     rep_name::String="Unassigned",
-    store_pulse::Bool=false, drug_presence=0::Int64)
+    store_pulse::Bool=false, drug_presence=0::Int64,
+    must_Nmax::Bool=false)
 
     # Can only insta_kill if drug_kill = true
     if insta_kill == true && drug_kill == false
@@ -706,10 +707,6 @@ function grow_kill_rec_cells(cells::Array{CancerCell}, tmax::Float64,
                     push!(kill_vec, i)
                 end
             end
-            # (deterministic version pre- using psi).
-            # if ran_k >= cells[i].R
-            #    push!(kill_vec, i)
-            # end
         end
         # Now kill the cells according to kill_vec
         deleteat!(cells, kill_vec)
@@ -830,6 +827,10 @@ function grow_kill_rec_cells(cells::Array{CancerCell}, tmax::Float64,
     end
 
     fin_t = round(tvec[length(tvec)], digits = 4)
+
+    if must_Nmax == true
+        length(cells) >= Nmax || error("must_Nmax is set to 'true': the simulation's cell numbers did not reach Nmax. Aborting.")
+    end
 
     return Grow_Kill_Rec_Out(cells, Nvec, tvec, Rvec, Evec,
     pulse_ts, pulse_cids, pulse_bcs, pulse_Rs,
