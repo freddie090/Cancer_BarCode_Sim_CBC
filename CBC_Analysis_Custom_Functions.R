@@ -306,7 +306,7 @@ qD_distance <- function(summ_df, samp_suffix, n_sub_pop){
 # Other Functions.  
 #################################################################
 
-stable_R_pheno <- function(mu, sig, del, br, dr, round_p=F){
+stable_R_pheno <- function(mu, sig, del, br, dr, sig_fig_p=F, n_dig=6){
   
   # Constructing Quadratic Formula
   result <- function(a,b,c){
@@ -346,8 +346,8 @@ stable_R_pheno <- function(mu, sig, del, br, dr, round_p=F){
     p <- result(a, b, c)[[2]]
   }
 
-  if(round_p == T){
-    return(round(p, digits = 6))
+  if(sig_fig_p == T){
+    return(signif(p, digits = n_dig))
   }else{
     return(p) 
   }
@@ -407,3 +407,173 @@ pal2 <- colorRampPalette(brewer.pal("Spectral", n = 10))(10)[c(1:3, 6:10)]
 # continuous variables. 
 
 anac <- function(x){return(as.numeric(as.character(x)))}
+
+# Coerce variables to factors and then order for plotting. 
+
+order_factors <- function(df){
+  df$p <- factor(df$p, levels = unique(df$p)[order(unique(as.numeric(as.character(df$p))))])
+  df$mu <- factor(df$mu, levels = unique(df$mu)[order(unique(as.numeric(as.character(df$mu))))])
+  df$sig <- factor(df$sig, levels = unique(df$sig)[order(unique(as.numeric(as.character(df$sig))))])
+  df$del <- factor(df$del, levels = unique(df$del)[order(unique(as.numeric(as.character(df$del))))])
+  df$q <- factor(df$q, levels = unique(df$q)[order(unique(as.numeric(as.character(df$q))))])
+  df$eq_R <- factor(df$eq_R, levels = unique(df$eq_R)[order(unique(as.numeric(as.character(df$eq_R))))])
+  return(df)
+}
+
+
+
+
+# Function that, given a rel_freq_df (wide-fromat), two samples (x-axis, y-axis) 
+# returns a ggplot object. Plot_n denotes which of the 4x4 (total 16) plots in 
+# the grid this current function refers to. Can then remove axis elements to 
+# ensure that the final plot isn't cluttered with repeated axis elements for 
+# each individual plot. 
+
+plot_comp_scatter <- function(x_samp, y_samp, plot_n, rf_df, ax_max, text_size,
+                              abs_count=F){
+  
+  # Pull out chosen samples
+  sub_df <- rf_df[, c("Center", x_samp, y_samp)]
+  # Remove those barcodes found in neither
+  sub_df <- sub_df[rowSums(sub_df == 0) < 2 ,]
+  # Factorise by shared/unique
+  sub_df["shared_unique"] <- 1 - (rowSums(sub_df == 0)) 
+  sub_df$shared_unique[sub_df$shared_unique == 0] <- "unique"
+  sub_df$shared_unique[sub_df$shared_unique == 1] <- "shared"
+  sub_df$shared_unique <- as.factor(sub_df$shared_unique)
+  
+  # Plot params
+  group.colours <- c(unique = "red", shared ="blue")
+  
+  if(abs_count == F){
+    
+    ax_breaks <- 10^(-10:0)
+    # Plot object for relative frequencies
+    p <- ggplot(data = sub_df, aes_string(x = x_samp, y = y_samp, fill = "shared_unique")) + 
+      geom_point(alpha = 0.4, size = 3.0, shape = 21, colour = "black") + 
+      scale_x_continuous(trans = "mylog10", breaks = c(0, (ax_breaks - 1e-09)), 
+                         name = x_samp, limits = c(0, ax_max)) + 
+      scale_y_continuous(trans = "mylog10", breaks = c(0, (ax_breaks - 1e-09)), 
+                         name = y_samp, limits = c(0, ax_max)) + 
+      scale_fill_manual(values = group.colours) +
+      theme_FW(text_size) + 
+      theme(legend.position = "none") + 
+      theme(axis.text.x = element_text(angle = 45, hjust = 1),
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank()) + 
+      annotation_logticks(base = 10, sides = "bl", outside = T)
+  }
+
+  
+  if(abs_count == T){
+    
+    ax_breaks <- 10^(0:10)
+    # Plot object for absolute counts
+    p <- ggplot(data = sub_df, aes_string(x = x_samp, y = y_samp, fill = "shared_unique")) + 
+      geom_point(alpha = 0.4, size = 3.0, shape = 21, colour = "black") + 
+      scale_x_continuous(trans = "mylog10_2", breaks = c(0, (ax_breaks - 1)), 
+                         name = paste0("\n", x_samp), limits = c(0, ax_max)) + 
+      scale_y_continuous(trans = "mylog10_2", breaks = c(0, (ax_breaks - 1)), 
+                         name = paste0(y_samp, "\n"), limits = c(0, ax_max)) + 
+      scale_fill_manual(values = group.colours) +
+      theme_FW(text_size) + 
+      theme(legend.position = "none") + 
+      theme(axis.text.x = element_text(angle = 45, hjust = 1),
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank()) + 
+      annotation_logticks(base = 10, sides = "bl", outside = T)
+  }
+  
+  # Remove xlabels if NOT in xlab vec
+  xlab_vec <- c(13, 14, 15, 16)
+  if(sum(xlab_vec == plot_n) == 0){
+    p <- p + theme(axis.text.x=element_blank(),
+                   axis.title.x=element_blank())
+  }
+  # Remove ylabels if NOT in ylab vec
+  ylab_vec <- c(1, 5, 9, 13)
+  if(sum(ylab_vec == plot_n) == 0){
+    p <- p + theme(axis.text.y=element_blank(),
+                   axis.title.y=element_blank())
+  }
+  
+  return(p)
+  
+}
+
+
+
+
+
+
+################################################################################
+
+# Large colour palettes for muller plots etc. 
+
+swatch <- function(x) {
+  # x: a vector of colours (hex, numeric, or string)
+  par(mai=c(0.2, max(strwidth(x, "inch") + 0.4, na.rm = TRUE), 0.2, 0.4))
+  barplot(rep(1, length(x)), col=rev(x), space = 0.1, axes=FALSE,
+          names.arg=rev(x), cex.names=0.8, horiz=T, las=1)
+}
+
+# Example:
+# swatch(colours()[1:10])
+# swatch(iwanthue(5))
+# swatch(1:4)
+
+iwanthue <- function(n, hmin=0, hmax=360, cmin=0, cmax=180, lmin=0, lmax=100,
+                     plot=FALSE, random=FALSE) {
+  # Presently doesn't allow hmax > hmin (H is circular)
+  # n: number of colours
+  # hmin: lower bound of hue (0-360)
+  # hmax: upper bound of hue (0-360)
+  # cmin: lower bound of chroma (0-180)
+  # cmax: upper bound of chroma (0-180)
+  # lmin: lower bound of luminance (0-100)
+  # lmax: upper bound of luminance (0-100)
+  # plot: plot a colour swatch?
+  # random: should clustering be random? (if FALSE, seed will be set to 1,
+  #         and the RNG state will be restored on exit.)
+  require(colorspace)
+  stopifnot(hmin >= 0, cmin >= 0, lmin >= 0,
+            hmax <= 360, cmax <= 180, lmax <= 100,
+            hmin <= hmax, cmin <= cmax, lmin <= lmax,
+            n > 0)
+  if(!random) {
+    if (exists(".Random.seed", .GlobalEnv)) {
+      old_seed <- .GlobalEnv$.Random.seed
+      on.exit(.GlobalEnv$.Random.seed <- old_seed)
+    } else {
+      on.exit(rm(".Random.seed", envir = .GlobalEnv))
+    }
+    set.seed(1)
+  }
+  lab <- LAB(as.matrix(expand.grid(seq(0, 100, 1),
+                                   seq(-100, 100, 5),
+                                   seq(-110, 100, 5))))
+  if (any((hmin != 0 || cmin != 0 || lmin != 0 ||
+           hmax != 360 || cmax != 180 || lmax != 100))) {
+    hcl <- as(lab, 'polarLUV')
+    hcl_coords <- coords(hcl)
+    hcl <- hcl[which(hcl_coords[, 'H'] <= hmax & hcl_coords[, 'H'] >= hmin &
+                       hcl_coords[, 'C'] <= cmax & hcl_coords[, 'C'] >= cmin &
+                       hcl_coords[, 'L'] <= lmax & hcl_coords[, 'L'] >= lmin), ]
+    #hcl <- hcl[-which(is.na(coords(hcl)[, 2]))]
+    lab <- as(hcl, 'LAB')
+  }
+  lab <- lab[which(!is.na(hex(lab))), ]
+  clus <- kmeans(coords(lab), n, iter.max=50)
+  if (isTRUE(plot)) {
+    swatch(hex(LAB(clus$centers)))
+  }
+  hex(LAB(clus$centers))
+}
+
+# From: https://gist.github.com/johnbaums/45b49da5e260a9fc1cd7
+#################
+
+###############################################################################
+
+
+

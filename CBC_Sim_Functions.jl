@@ -640,7 +640,7 @@ function grow_kill_rec_cells(cells::Array{CancerCell}, tmax::Float64,
     R_real="b"::String, drug_kill::Bool=false, insta_kill::Bool=false,
     rep_name::String="Unassigned",
     store_pulse::Bool=false, drug_presence=0::Int64,
-    must_Nmax::Bool=false)
+    must_Nmax::Bool=false, t_frac=0.050::Float64)
 
     # Can only insta_kill if drug_kill = true
     if insta_kill == true && drug_kill == false
@@ -788,7 +788,8 @@ function grow_kill_rec_cells(cells::Array{CancerCell}, tmax::Float64,
 
         # Grow cells
         grow_out = grow_cells(cells, t_pulse_change, Nmax, mu, sig,
-        del, psi=psi, al=al, R_real=R_real, drug_presence=drug_presence)
+        del, psi=psi, al=al, R_real=R_real, drug_presence=drug_presence,
+        t_frac=t_frac)
         # Assign cells.
         cells = grow_out.cells
         # Add the grow_output's Nvec and tvec to the total

@@ -35,6 +35,16 @@ function join_dfs(dfs::Array{DataFrame}, colname::String)
 
 end
 
+# Function that returns the number of cells with a given barcode lineage
+# identity.
+
+function single_bc_count(cells::Array{CancerCell}, bc_lin::Float64)
+
+    n = sum(map(x -> x.barcode, cells) .== bc_lin)
+
+    return n
+
+end     
 
 # Functions to pull out cell parameters from experiment outputs and convert
 # into plotting-friendly data frames.
