@@ -9,7 +9,6 @@
 # Load required R packages: 
 
 library(ggplot2)
-library(dplyr)
 library(cowplot)
 library(RColorBrewer)
 library(scales)
@@ -20,6 +19,7 @@ library(stringr)
 library(vegan)
 library(tidyr)
 library(plyr)
+library(dplyr)
 
 
 #################################################################

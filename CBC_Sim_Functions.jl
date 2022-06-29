@@ -1,6 +1,6 @@
 
 # Cancer Barcode Simulation
-# Freddie Whiting - 2021
+# Freddie Whiting - 2022
 
 # Functions
 
@@ -48,18 +48,6 @@
 # or 1.0 if R = 0.
 # Cells are grown either until t reaches tmax or N reaches Nmax.
 # By default, the cost of resistance is realised in the birth rate (R_real = b).
-
-# Implementing variability in the resistance phenotype:
-# If al == be == 0.0, the simulation reverts to the binary resistance phenotype
-# outlined above. If al != 0.0 | be != 0.0, the resistance phenotype is now
-# drawn from a Beta distribution: R = Beta(al, be). The probability of death
-# during the drug-kill step is still (1 - R).
-# 'Mutation' means a sensitive cell gains a resistant phenotype, with
-# probability μ (mu) per division - by drawing from the Beta(al, be).
-# The cost of resistance - δ (del) - still functions on a binary basis:
-# resistant cells (R > 0.0) incurr the cost, whereas sensitive (R = 0.0) do not.
-# The 'plasticity' functionality - σ (sig) - still controls the rate at which
-# cells transition from resistant (R > 0.0) to sensitive.
 
 
 ############################
@@ -144,7 +132,6 @@ function seed_cells(N::Int64, b::Float64, d::Float64, p::Float64,
 
     cells = Array{CancerCell}(undef, N)
     Rs = zeros(N)
-    Es = zeros(N)
     # Use lib to decide whether to use a BarcodeLibrary or default to 1:N.
     if use_lib
         bcs = sample(bc_lib.barcodes, N, replace = true)
@@ -153,7 +140,7 @@ function seed_cells(N::Int64, b::Float64, d::Float64, p::Float64,
     end
     # Assign all the fields to the CancerCell accordingly.
     for i in 1:length(cells)
-        cells[i] = CancerCell(i, bcs[i], b, d, Rs[i], Es[i], 0)
+        cells[i] = CancerCell(i, bcs[i], b, d, Rs[i], 0)
     end
 
     # Assign resistance to the initial cells for the 'pre-existing' scenario
@@ -163,12 +150,7 @@ function seed_cells(N::Int64, b::Float64, d::Float64, p::Float64,
         np = rand(Poisson(p * length(cells)))
         p_cells = sample(1:length(cells), np, replace = false)
         for i in 1:np
-            #if res_phen == "bin"
-                cells[p_cells[i]].R = 1.0
-            #elseif res_phen == "var"
-            #    R_phenos = round.(rand(Beta(al, be), np), digits = 4)
-            #    cells[p_cells[i]].R = R_phenos[i]
-            #end
+            cells[p_cells[i]].R = 1.0
         end
     end
 
@@ -185,17 +167,9 @@ function seed_cells(N::Int64, b::Float64, d::Float64, p::Float64,
         end
         R_cells = sample(1:length(cells), nR, replace = false)
         for i in 1:nR
-            #if res_phen == "bin"
-                cells[R_cells[i]].R = 1.0
-            #elseif res_phen == "var"
-            #    R_phenos = round.(rand(Beta(al, be), nR), digits = 4)
-            #    cells[R_cells[i]].R = R_phenos[i]
-            #end
+            cells[R_cells[i]].R = 1.0
         end
     end
-
-    # NB always assume that all cells start with 0 'escape mutations'.
-    # Therefore all cells' 'E' values remain at 0.0.
 
     return cells
 
@@ -213,7 +187,6 @@ function copycell(orig_cell::CancerCell)
     copy(orig_cell.b),
     copy(orig_cell.d),
     copy(orig_cell.R),
-    copy(orig_cell.E),
     copy(orig_cell.Ndiv)
     )
 end
@@ -227,7 +200,7 @@ end
 function grow_cells(cells::Array{CancerCell}, tmax::Float64,
     Nmax::Int64, mu::Float64, sig::Float64, del::Float64;
     psi=0.0::Float64, al=0.0::Float64,
-    R_real="b"::String, drug_presence=0::Int64, t_frac=0.050::Float64)
+    R_real="b"::String, t_frac=0.050::Float64)
 
     out_cells = deepcopy.(cells)
 
@@ -240,68 +213,48 @@ function grow_cells(cells::Array{CancerCell}, tmax::Float64,
     length(unique(map(x -> x.b, out_cells))) == 1 || error("For this simulation, cells should have a uniform base birth and death rate.")
     length(unique(map(x -> x.d, out_cells))) == 1 || error("For this simulation, cells should have a uniform base birth and death rate.")
     R_real == "b" || R_real == "d" || R_real == "l" || error("R_real can only take 'b', 'd' or 'l' as a value.")
-    drug_presence == 1 || drug_presence == 0 || error("drug_presence must only take either '0' (absence) or 1 (presence) as values.")
-
 
     # Maximum cell birth and death rates need to be changed for KMC steps if
     # using the cost of resistance version is being used.
 
-    # if the drug is absent (drug_presence = 0):
-    # the maximum death rate is d + (lam*δ) (if R_real = d)
-    # if the drug is present (drug_presence = 1):
-    # the maximum birth rate is b + (lam*δ) (if R_real = b).
-    # whilst the maximum birth and death rates are:
-    #                           b * (1+del),
-    #                       and d * (1+del), (if R_real = l).
-
-
-    # For now, regardless of the number of resistance mutations (R), a cell
-    # will only incur the benefit/cost as δ.
+    # For now a cell will only incur the benefit/cost as δ.
     # R_real determines if the cost is incurred in the birth or death rates, or
     # shared proportionately amongst both rates; "b", "d" and "l", respectively.
-
-    # Finally, implementing 'jackpot' mutations that occur with rate α (al) per
-    # division when a cell is resistant where, if it occurs, a cell's 'E'
-    # variable becomes 1.0, and that cell (and ancestors) no longer incur the
-    # fitness cost according to δ (del).
-    # Following a resistant cell dividing, switching back to sensitive
-    # (controlled by σ (sig)) takes precedence over the jackpot mutations - i.e.
-    # this probability is calculated first.
-    # If a resistant cell with an escape mutation (R > 0.0 & E > 0.0) reverts
-    # to sensitive (controlled by σ (sig)), both the resistant and escape
-    # status are lost (R = 0.0, E = 0.0).
 
     bmax = maximum(map(x -> x.b, out_cells))
     dmax = maximum(map(x -> x.d, out_cells))
     # Save the population's pre-cost, net growth rate, λ (lam).
     lam = bmax - dmax
-    # Save the normalised birth and death rates for R_real = l,
-    #bnorm = bmax/(bmax + dmax)
-    #dnorm = dmax/(bmax + dmax)
+
+    ####################################
+    # Cost of Resistance Change to bdmax
+    ####################################
 
     # If using the cost of resistance simulation, need to update bmax and dmax
     # as the highest population b/d rates can now be higher if drug present.
     # The cost of resistance is only implemented if δ > 0.0.
     if del > 0.0
-        if     drug_presence == 0 && R_real == "d"
+        if R_real == "d"
             dmax = dmax + (lam*del)
             bdmax = bmax + dmax
-        elseif drug_presence == 1 && R_real == "b"
-            bmax = bmax + (lam*del)
-            bdmax = bmax + dmax
-        elseif drug_presence == 0 && R_real == "l"
+        elseif R_real == "b"
             # Both are now smaller, so don't need to change either b/dmax.
             bdmax = bmax + dmax
-        elseif drug_presence == 1 && R_real == "l"
-            bmax = bmax * (1+del)
-            dmax = dmax * (1+del)
-            bdmax = bmax + dmax
-        else
+        elseif R_real == "l"
+            # Both are now smaller, so don't need to change either b/dmax.
             bdmax = bmax + dmax
         end
+
+    ####################################
+    # Non-Cost bdmax
+    ####################################
+
+    # If not using cost of resistance, simply b + d
     else
         bdmax = bmax + dmax
     end
+
+    ####################################
 
     # Create vector to hold time, and initiate at 0.
     t = 0.0
@@ -317,13 +270,14 @@ function grow_cells(cells::Array{CancerCell}, tmax::Float64,
     # Have a vector to save the number of live cells every t_rec.
     Nvec = Int64[Nt]
     # Also have vectors to save the number of cells that have a resistance
-    # mutation (Rvec) and the number of cells that have an escape mutation
-    # (Evec). Keep track of the number only when an event happens with
+    # mutation (Rvec). Keep track of the number only when an event happens with
     # count vectors to avoid repeatedely using map (expensive).
     Rcount = sum(map(x -> x.R, out_cells))
-    Ecount = sum(map(x -> x.E, out_cells))
     Rvec  = Int64[Rcount]
-    Evec = Int64[Ecount]
+
+    ##############################
+    # Sampling and Killing Vectors
+    ##############################
 
     # Opposed to sampling directly from out_cells, have a 'samp_vec'. Update
     # this following a birth or death accordingly:
@@ -331,12 +285,12 @@ function grow_cells(cells::Array{CancerCell}, tmax::Float64,
     # if a death, change this index in the sampling vec to 0, and add the index
     # to the 'kill_vec'.
     # Keep sampling from samp_vec until ran_cell_pos > 0
-    # This way, don't have to use deleteat! (which is expensive) until the very
-    # end.
     samp_vec = collect(1:length(out_cells))
     kill_vec = Array{Int64}(undef, 0)
 
+    ###########################
     # Grow cells until t = tmax
+    ###########################
 
     while t <= tmax
 
@@ -364,7 +318,6 @@ function grow_cells(cells::Array{CancerCell}, tmax::Float64,
             push!(Nvec, Nt)
             push!(tvec, t)
             push!(Rvec, Rcount)
-            push!(Evec, Ecount)
             t_rec += t_rec_change
         end
 
@@ -381,92 +334,52 @@ function grow_cells(cells::Array{CancerCell}, tmax::Float64,
             push!(Nvec, Nt)
             push!(tvec, t)
             push!(Rvec, Rcount)
-            push!(Evec, Ecount)
             break
         end
+
         # Otherwise, continue with the birth and death steps.
 
-        # NB - the trade-off of resistance is realied as follows,
+        #######################################
+        # Realisation of the Cost of Resistance
+        #######################################
+
+        # NB - the cost of resistance is realied as follows,
         # where λ = (b - d).
 
-        # the drug is absent:
-            # trade-off realised in birth rate.
-                # b = b - λ*δ
-                # d = d
-            # trade-off realised in death rate.
-                # b = b
-                # d = d + λ*δ
-            # trade-off realised in both rates.
-                # b = b * (1-δ)
-                # d = d * (1-δ)
-        # the drug is present:
-            # trade-off realised in birth rate.
-                # b = b + λ*δ
-                # d = d
-            # trade-off realised in death rate.
-                # b = b
-                # d = d - λ*δ
-            # trade-off realised in both rates.
-                # b = b * (1+δ)
-                # d = d * (1+δ)
-
-        # NB that this means if using the 'l' cost version (both rates), then
-        # both birth AND deat rates are lower. It is cell turnover that is
-        # either reduced or increased depending on drug-presence.
+        # trade-off realised in birth rate.
+            # b = b - λ*δ
+            # d = d
+        # trade-off realised in death rate.
+            # b = b
+            # d = d + λ*δ
+        # trade-off realised in both rates.
+            # b = b * (1-δ)
+            # d = d * (1-δ)
 
         # Set cell_b and cell_d using the trade-off if performing the cost of
         # resistance simulation.
 
-        # If the chosen cell has gained an 'escape' mutation (CancerCell
-        # variable 'E') then the cell no longer experiences the cost of
-        # resistance and the rates simply revert to the 'wild-type' birth
-        # and death rates.
-
         if del > 0.0
+
+            # If chosen cell is resistant...
             if out_cells[ran_cell_pos].R > 0
 
-                if out_cells[ran_cell_pos].E > 0
-                    # Escapes cost of resistance.
-                    cell_b = out_cells[ran_cell_pos].b
+                # Calculate the cost incurred according to 'R_real'.
+                if R_real == "b"
+                    cell_b = out_cells[ran_cell_pos].b - (lam*del)
                     cell_d = out_cells[ran_cell_pos].d
-                else
-                    # Otherwise, calculate the cost incurred according to 'R_real'.
-                    if drug_presence == 0
-                        if R_real == "b"
-                            cell_b = out_cells[ran_cell_pos].b - (lam*del)
-                            cell_d = out_cells[ran_cell_pos].d
-                        end
-                        if R_real == "d"
-                            cell_b = out_cells[ran_cell_pos].b
-                            cell_d = out_cells[ran_cell_pos].d + (lam*del)
-                        end
-                        if R_real == "l"
-                            cell_b = out_cells[ran_cell_pos].b * (1-del)
-                            cell_d = out_cells[ran_cell_pos].d * (1-del)
-                        end
-                    end
-
-                    if drug_presence == 1
-                        if R_real == "b"
-                            cell_b = out_cells[ran_cell_pos].b + (lam*del)
-                            cell_d = out_cells[ran_cell_pos].d
-                        end
-                        if R_real == "d"
-                            cell_b = out_cells[ran_cell_pos].b
-                            cell_d = out_cells[ran_cell_pos].d - (lam*del)
-                        end
-                        if R_real == "l"
-                            cell_b = out_cells[ran_cell_pos].b * (1+del)
-                            cell_d = out_cells[ran_cell_pos].d * (1+del)
-                        end
-                    end
                 end
+                if R_real == "d"
+                    cell_b = out_cells[ran_cell_pos].b
+                    cell_d = out_cells[ran_cell_pos].d + (lam*del)
+                end
+                if R_real == "l"
+                    cell_b = out_cells[ran_cell_pos].b * (1-del)
+                    cell_d = out_cells[ran_cell_pos].d * (1-del)
+                end
+
+            # Otherwise, cell is sensitive...
             else
-                # NB If the cell has no resistance mutations, use the 'wild-type'
-                # birth and death rates, regardless of drug_presence... doesn't
-                # make biological sense as the drug should reduce fitness of the
-                # wild-type... but okay for now because we're looking at relative
-                # fitness... will have to reconsider if implement drug presence.
                 cell_b = out_cells[ran_cell_pos].b
                 cell_d = out_cells[ran_cell_pos].d
             end
@@ -478,6 +391,9 @@ function grow_cells(cells::Array{CancerCell}, tmax::Float64,
             if cell_d < 0
                 cell_d = 0
             end
+
+        #######################################
+
         # If not using cost of resistance simulation, simply assign rates from
         # the randomly selected cell.
         else
@@ -485,7 +401,10 @@ function grow_cells(cells::Array{CancerCell}, tmax::Float64,
             cell_d = out_cells[ran_cell_pos].d
         end
 
+        #############################
         # Birth step
+        #############################
+
         if ran < cell_b
 
             # Update the cells number of divisions.
@@ -495,70 +414,41 @@ function grow_cells(cells::Array{CancerCell}, tmax::Float64,
             # NB Here, BOTH DAUGHTER CELLS INHERIT THE MUTATION.
             # 'Grey -> Black + Black'
 
-            # Calculate if a transition to or from the resistance phenotype
-            # occurs - mu corresponds to the probability of a mutation to
-            # resistance, whereas sig corresponds to a mutation from resistance,
-            # per division (therefore <= 1.0).
-            #if res_phen == "bin"
-                ran_cell.R == 0 || ran_cell.R == 1 || error("A cell's R is not 0 or 1 in the binary resistance sim.")
-            #end
-            #if res_phen == "var"
-            #    ran_cell.R >= 0 || error("A cell's R is negative in the variable resistance sim: al | be > 0.0.")
-            #end
+            ran_cell.R == 0 || ran_cell.R == 1 || error("A cell's R is not 0 or 1 in the binary resistance sim.")
+
             ran_p = rand()
-            # Draw a SECOND random number to do the 'escape' mutation. NB that
-            # if you _don't_ do this, you can never get an escape mutation when
-            # sig > al.
-            ran_pE = rand()
-            # Sensitive to Resistant with rate mu. Update the resistance
-            # phenotype according to either the binary or variable model:
+
+            #############################
+            # Sensitive -> Resistant
+            #############################
+
             if ran_cell.R == 0.0
                 if mu > ran_p
-                    #if res_phen == "bin"
                         ran_cell.R += 1
                         out_cells[ran_cell_pos].R += 1
                         # Also update Rcount with number of resistant cells.
                         Rcount += 2
-                    #end
-                    #if res_phen == "var"
-                    #    new_R = round(rand(Beta(al, be)), digits = 4)
-                    #    ran_cell.R = new_R
-                    #    out_cells[ran_cell_pos].R = new_R
-                    #end
                 end
-            # Resistant to Sensitive with rate sig. Sensitive is always R = 0.0,
-            # regardless of the resistance phenotype model type.
-            # This switching step takes precedent over the 'escape mutation'
-            # rate (al), which occurs if the cell remains resistant with
-            # rate al. Again, both daughter cells inherent the 'mutation'.
+
+            #############################
+            # Resistant -> Sensitive
+            #############################
+
             elseif ran_cell.R > 0.0
                 if sig > ran_p
                     ran_cell.R = 0.0
                     out_cells[ran_cell_pos].R = 0.0
                     # Update R count vector accordingly.
                     Rcount -= 1
-                    if ran_cell.E == 1.0
-                        # Cell also loses 'escape mutations'.
-                        ran_cell.E = 0.0
-                        out_cells[ran_cell_pos].E = 0.0
-                        # Update E count vector accordingly.
-                        Ecount -= 1
-                    end
-                # If the current cell does not have an escape mutation,
-                # now let daughter cells acquire escape with probability al.
-                elseif ran_cell.E == 0.0
-                    if al > ran_pE
-                        ran_cell.E = 1.0
-                        out_cells[ran_cell_pos].E = 1.0
-                        # Also update Ecount with number of resistant cells.
-                        Ecount += 2
-                    end
                 else
-                    # No mutations - update R and E count vectors accordingly.
+                    # No mutations - update R count vector accordingly.
                     Rcount += 1
-                    Ecount += 1
                 end
             end
+
+            #############################
+            # Update count vectors
+            #############################
 
             push!(out_cells, ran_cell)
             # Update samp_vec with the new length of the output cells.
@@ -567,7 +457,10 @@ function grow_cells(cells::Array{CancerCell}, tmax::Float64,
             Nt += 1
         end
 
+        #############################
         # Death step
+        #############################
+
         if bmax <= ran < bmax + cell_d
             # Remove this chosen cell's index from the samp_vec.
             samp_vec[ran_samp_pos] = 0
@@ -577,11 +470,12 @@ function grow_cells(cells::Array{CancerCell}, tmax::Float64,
             # Update the R and E count vectors accordingly.
             if out_cells[ran_cell_pos].R == 1.0
                 Rcount -= 1
-                if out_cells[ran_cell_pos].E == 1.0
-                    Ecount -= 1
-                end
             end
         end
+
+        #############################
+        # Check for extinction
+        #############################
 
         # Break if no cells remain. Make use of the fact that:
         # samp_vec = N0 + nbirths
@@ -592,7 +486,6 @@ function grow_cells(cells::Array{CancerCell}, tmax::Float64,
             push!(Nvec, Nt)
             push!(tvec, t)
             push!(Rvec, Rcount)
-            push!(Evec, Ecount)
             break
         end
 
@@ -603,7 +496,7 @@ function grow_cells(cells::Array{CancerCell}, tmax::Float64,
 
     fin_t = round(t, digits = 4)
 
-    return Grow_Out(out_cells, Nvec, tvec, Rvec, Evec, fin_t)
+    return Grow_Out(out_cells, Nvec, tvec, Rvec, fin_t)
 
 end
 
@@ -639,8 +532,7 @@ function grow_kill_rec_cells(cells::Array{CancerCell}, tmax::Float64,
     psi=0.0::Float64, al=0.0::Float64,
     R_real="b"::String, drug_kill::Bool=false, insta_kill::Bool=false,
     rep_name::String="Unassigned",
-    store_pulse::Bool=false, drug_presence=0::Int64,
-    must_Nmax::Bool=false, t_frac=0.050::Float64)
+    store_pulse::Bool=false, must_Nmax::Bool=false, t_frac=0.050::Float64)
 
     # Can only insta_kill if drug_kill = true
     if insta_kill == true && drug_kill == false
@@ -656,12 +548,10 @@ function grow_kill_rec_cells(cells::Array{CancerCell}, tmax::Float64,
 
     # Create a vector of times, corresponding population size and mean
     # population R score to track the barcoded cell growth progress.
-    # Also keep track of the number of resistant cells (R>0.0) and cells
-    # with an escape mutation (E>0.0).
+    # Also keep track of the number of resistant cells (R>0.0).
     Nvec = Int64[]
     tvec = Float64[]
     Rvec = Int64[]
-    Evec = Int64[]
 
     # Also store the cell_IDs, barcodes and R scores: at the beginning, just
     # prior to each drug pulse and at the end of the growth period.
@@ -683,7 +573,6 @@ function grow_kill_rec_cells(cells::Array{CancerCell}, tmax::Float64,
     push!(Nvec, length(cells))
     push!(tvec, t)
     push!(Rvec, sum(map(x -> x.R, cells)))
-    push!(Evec, sum(map(x -> x.E, cells)))
 
     # If insta_kill=true and drug_kill=true, perform a drug-kill step before
     # continuing with the growth stage.
@@ -749,10 +638,6 @@ function grow_kill_rec_cells(cells::Array{CancerCell}, tmax::Float64,
                             push!(kill_vec, i)
                         end
                     end
-                    # (deterministic version pre- using psi).
-                    # if ran_k >= cells[i].R
-                    #    push!(kill_vec, i)
-                    # end
                 end
                 # Now kill the cells according to kill_vec
                 deleteat!(cells, kill_vec)
@@ -775,7 +660,6 @@ function grow_kill_rec_cells(cells::Array{CancerCell}, tmax::Float64,
             push!(Nvec, length(cells))
             push!(tvec, t)
             push!(Rvec, sum(map(x -> x.R, cells)))
-            push!(Evec, sum(map(x -> x.E, cells)))
             break
         end
 
@@ -784,20 +668,18 @@ function grow_kill_rec_cells(cells::Array{CancerCell}, tmax::Float64,
         push!(Nvec, length(cells))
         push!(tvec, t)
         push!(Rvec, sum(map(x -> x.R, cells)))
-        push!(Evec, sum(map(x -> x.E, cells)))
 
         # Grow cells
         grow_out = grow_cells(cells, t_pulse_change, Nmax, mu, sig,
-        del, psi=psi, al=al, R_real=R_real, drug_presence=drug_presence,
+        del, psi=psi, al=al, R_real=R_real,
         t_frac=t_frac)
         # Assign cells.
         cells = grow_out.cells
         # Add the grow_output's Nvec and tvec to the total
         # time and population size vectors for grow_kill_rec.
-        # Also extract the output structures Rvec and Evec.
+        # Also extract the output structures Rvec.
         append!(Nvec, grow_out.Nvec)
         append!(Rvec, grow_out.Rvec)
-        append!(Evec, grow_out.Evec)
         # Need to account for the fact that the grow_out's t_vec has started
         # from t=0 again.
         grow_out.tvec .+= t
@@ -833,7 +715,7 @@ function grow_kill_rec_cells(cells::Array{CancerCell}, tmax::Float64,
         length(cells) >= Nmax || error("must_Nmax is set to 'true': the simulation's cell numbers did not reach Nmax. Aborting.")
     end
 
-    return Grow_Kill_Rec_Out(cells, Nvec, tvec, Rvec, Evec,
+    return Grow_Kill_Rec_Out(cells, Nvec, tvec, Rvec,
     pulse_ts, pulse_cids, pulse_bcs, pulse_Rs,
     rep_name, fin_t)
 
@@ -864,7 +746,7 @@ function expand_split_cells(N::Int64, b::Float64, d::Float64,
     t_exp::Float64, N_seed::Int64, N_reps::Int64, p::Float64,
     mu::Float64, sig::Float64, del::Float64;
     psi=0.0::Float64, al=0.0::Float64,
-    R_real="b"::String, drug_presence=0::Int64, use_lim_probs=true::Bool)
+    R_real="b"::String, use_lim_probs=true::Bool)
 
     # Use limiting probabilities according to use_lim_probs, and plastic/res_cost
     if use_lim_probs == false
@@ -877,7 +759,7 @@ function expand_split_cells(N::Int64, b::Float64, d::Float64,
 
     # Expand the cells for t_exp. Set the Nmax to >> than can simulate.
     exp_cells = grow_cells(init_cells, t_exp, 10^10, mu, sig, del,
-    psi=psi, al=al, R_real=R_real, drug_presence=drug_presence).cells
+    psi=psi, al=al, R_real=R_real).cells
 
     # Need to split into N_reps * 2 - N_reps x control (CO) 'flasks'.
     #                               - N_reps x drug-treatment (DT) 'flasks'.

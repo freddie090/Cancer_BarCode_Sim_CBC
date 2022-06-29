@@ -335,3 +335,126 @@ function Run_Exp_Sub_Lins(N::Int, b::Float64, d::Float64, p::Float64,
 
 
 end
+
+
+################################################################################
+
+# Simulate the in vitro experiment that aims to distinguish between evolutionary
+# scenarios where either:
+# - sig > 0.0, or
+# - del > 0.0
+# The experiment takes a set of N0 putatively exclusively resistant cells, grows
+# them for delt_1, takes N0 again, grows for delt_2,... etc.
+# The number and proportion of resistant cells are recorded following each of
+# the growth windows.
+# The expanded cells for each delt_n are then sampled k times (K replicates),
+# where Ni cells are sampeld each time - the distribution amongst these
+# replicates is also then recorded.
+
+function Run_Exp_Rep_Exc_Res_sigtest(N0::Int, b::Float64, d::Float64,
+    mu::Float64, sig::Float64, del::Float64, n_delt::Int64, delt::Float64,
+    K::Int64, Ni::Int64, Nsims::Int64)
+
+    # Create vectors to save the multiple simulation runs.
+    res_dfs = Array{DataFrame}(undef, 0)
+    exp_res_dfs = Array{DataFrame}(undef, 0)
+
+    # Repeat for each Nsim repeat:
+    for Nsim in 1:Nsims
+        # Seed the N0 exclusively resistant cells.
+        init_cells = seed_cells(N0, b, d, 0.0, mu, sig, del)
+        # Manually set to exclusively resistant.
+        map(x -> x.R = 1.0, init_cells)
+
+        # Create a vector to save the cell outputs.
+        cellvec = Array{Array{CancerCell}}(undef, 0)
+        # Add the initial cells.
+        push!(cellvec, init_cells)
+
+        # Grow the cells for delt, n_delt times, recording the cells at each.
+        for i in 1:n_delt
+            out_cells = grow_cells(init_cells, delt, 10^10, mu, sig, del, R_real = "l")
+            out_cells = out_cells.cells
+            push!(cellvec, out_cells)
+            init_cells = sample(out_cells, N0)
+        end
+
+        # Take K replicates of Ni cells (sampling without replacement) from the
+        # expanded cell populations, recording the number and fraction of
+        # resistant cells each time.
+        res_n_vec = Array{Int64}(undef, 0)
+        res_prop_vec = Array{Float64}(undef, 0)
+        delt_vec = Array{Float64}(undef, 0)
+
+        for i in 2:length(cellvec)
+            for k in 1:K
+                samp_cells = sample(cellvec[i], Ni, replace=false)
+                res_n = Int64(sum(map(x -> x.R, samp_cells)))
+                res_prop = res_n/Ni
+                push!(res_n_vec, res_n)
+                push!(res_prop_vec, res_prop)
+                push!(delt_vec, delt*(i-1))
+            end
+        end
+
+        # Store the results in a dataframe, along with pertinent simulation
+        # parameters.
+        res_df = DataFrame(res_n = res_n_vec, res_prop = res_prop_vec,
+        delt = delt_vec, b = b, d = d, mu = round(mu, digits = 10),
+        sig = round(sig, digits = 10), del = round(del, digits = 10),
+        n_delt = n_delt, K = K, Ni = Ni, Nsim = Nsim)
+
+        # Also store the total N, resistant n and proportion in the total,
+        # expanded pools.
+        exp_Ns = map(x -> length(x), cellvec)
+        exp_res_ns = map(y -> sum(map(x -> x.R, y)), cellvec)
+        exp_res_props = exp_res_ns ./ exp_Ns
+
+        # Also store the results in the dataframe, along with pertinent simulation
+        # parameters.
+        exp_res_df = DataFrame(N = exp_Ns,
+                               del_t = collect(0:delt:(delt*n_delt)),
+                               res_n = exp_res_ns,
+                               res_prop = exp_res_props,
+                               b = b, d = d,
+                               mu = round(mu, digits = 10),
+                               sig = round(sig, digits = 10),
+                               del = round(del, digits = 10),
+                               n_delt = n_delt, K = K, Ni = Ni,
+                               Nsim = Nsim)
+
+       push!(res_dfs, res_df)
+       push!(exp_res_dfs, exp_res_df)
+
+    end
+
+    # Merge the final output dataframes.
+    res_df_fin = vcat(res_dfs...)
+    exp_res_df_fin = vcat(exp_res_dfs...)
+
+    # Save the output to a directory named accordingly
+    cd("Outputs")
+    if isdir("Rep_Exc_Res") == true
+        cd("Rep_Exc_Res")
+    else
+        mkdir("Rep_Exc_Res")
+        cd("Rep_Exc_Res")
+    end
+    dir_name = string("CBC_Rep_Exc_Res_Exp_out_N0-", N0,
+    "_b-", round(b, digits=3), "_d-", round(d, digits = 3),
+    "_mu-", round(mu, digits = 10), "_sig-", round(sig, digits = 10),
+    "_del-", round(del, digits = 10))
+    if isdir(dir_name) == true
+        cd(dir_name)
+    else
+        mkdir(dir_name)
+        cd(dir_name)
+    end
+    @rput res_df_fin; @rput exp_res_df_fin;
+    R"""
+    write.csv(res_df_fin, file="res_df.csv", row.names = F)
+    write.csv(exp_res_df_fin, file="exp_res_df.csv", row.names = F)
+    """
+    cd("../../../")
+
+end

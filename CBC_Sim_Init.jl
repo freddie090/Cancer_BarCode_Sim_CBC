@@ -12,6 +12,7 @@ using Distributions
 using DataFrames
 using RCall
 using CSV
+using StatsBase
 using Base.Threads
 using Dates
 

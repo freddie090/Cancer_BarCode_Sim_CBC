@@ -22,7 +22,7 @@ mutable struct CancerCell
     b::Float64 # birth rate.
     d::Float64 # death rate.
     R::Float64 # Resistant phenotype (binary).
-    E::Float64 # Escape mutation (binary) - if 1.0, R no longer incurs cost.
+    #E::Float64 # Escape mutation (binary) - if 1.0, R no longer incurs cost.
     Ndiv::Int64 # Number of divisions a given cell lineage has experienced.
     #CancerCell() = new()
 end
@@ -34,7 +34,7 @@ mutable struct Grow_Out
     Nvec::Array{Int64}
     tvec::Array{Float64}
     Rvec::Array{Int64}
-    Evec::Array{Int64}
+    #Evec::Array{Int64}
     fin_t::Float64
 end
 
@@ -45,7 +45,7 @@ mutable struct Grow_Kill_Rec_Out
     Nvec::Array{Int64}
     tvec::Array{Float64}
     Rvec::Array{Int64}
-    Evec::Array{Int64}
+    #Evec::Array{Int64}
     pulse_ts::Array{Float64}
     pulse_cids::Array{Array{Int64}}
     pulse_bcs::Array{Array{Float64}}
@@ -88,3 +88,6 @@ mutable struct Experiment_Input
     DT_inputs::Array{CancerCell, 2}
     Experiment_Input()=new()
 end
+
+
+################################################################################

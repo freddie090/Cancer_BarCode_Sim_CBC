@@ -1,3 +1,5 @@
 # Ignore Output and Plot directories
 Outputs/
 Plots/
+STAN_Models/
+CBC_Sim_Functions_EXTENDED.jl

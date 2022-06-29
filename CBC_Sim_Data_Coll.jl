@@ -44,7 +44,7 @@ function single_bc_count(cells::Array{CancerCell}, bc_lin::Float64)
 
     return n
 
-end     
+end
 
 # Functions to pull out cell parameters from experiment outputs and convert
 # into plotting-friendly data frames.
@@ -168,12 +168,12 @@ function N_by_t(output::Grow_Kill_Rec_Out)
 
 end
 
-# N, R and E by time
+# N and R by time
 
-function NRE_by_t(output::Grow_Kill_Rec_Out)
+function NR_by_t(output::Grow_Kill_Rec_Out)
 
-    length(output.Nvec) == length(output.tvec) == length(output.Rvec) == length(output.Evec) || error("Nvec, Rvec and Evec should be the same length as tvec.")
-    df = DataFrame(t = output.tvec, N = output.Nvec, R = output.Rvec, E = output.Evec)
+    length(output.Nvec) == length(output.tvec) == length(output.Rvec) || error("Nvec and Rvec should be the same length as tvec.")
+    df = DataFrame(t = output.tvec, N = output.Nvec, R = output.Rvec)
 
     return df
 
